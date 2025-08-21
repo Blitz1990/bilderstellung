@@ -15,6 +15,14 @@ OUTPUT_DIR = "generated_images"
 PROMPTS_FILE = "prompts.txt"
 CONFIG_FILE = "config.ini"
 
+# --- Logging Helper ---
+def _log(message, callback=None):
+    """Log a message using a callback or print."""
+    if callback:
+        callback(message)
+    else:
+        print(message)
+
 # --- Base Class for Image Generation ---
 class ImageGenerator:
     """Abstract base class for image generators."""
@@ -24,7 +32,7 @@ class ImageGenerator:
         self.api_key = api_key
         self.style_suffix = style_suffix
 
-    def generate(self, prompt):
+    def generate(self, prompt, log_callback=None):
         """Generates an image from a prompt. Returns image data as bytes or a URL."""
         raise NotImplementedError
 
@@ -35,9 +43,9 @@ class OpenAIGenerator(ImageGenerator):
         super().__init__(api_key, style_suffix)
         self.client = OpenAI(api_key=self.api_key)
 
-    def generate(self, prompt):
+    def generate(self, prompt, log_callback=None):
         full_prompt = prompt + self.style_suffix
-        print(f"🎨 Generating with OpenAI for prompt: '{prompt}'...")
+        _log(f"🎨 Generating with OpenAI for prompt: '{prompt}'...", log_callback)
         try:
             response = self.client.images.generate(
                 model="dall-e-3",
@@ -47,18 +55,18 @@ class OpenAIGenerator(ImageGenerator):
                 n=1,
             )
             image_url = response.data[0].url
-            print("✅ OpenAI image generated successfully.")
+            _log("✅ OpenAI image generated successfully.", log_callback)
             return image_url
         except Exception as e:
-            print(f"❌ Error generating image with OpenAI: {e}")
+            _log(f"❌ Error generating image with OpenAI: {e}", log_callback)
             return None
 
 # --- Stability AI Generator ---
 class StabilityAIGenerator(ImageGenerator):
     """Image generator using Stability AI's API."""
-    def generate(self, prompt):
+    def generate(self, prompt, log_callback=None):
         full_prompt = prompt + self.style_suffix
-        print(f"🎨 Generating with StabilityAI for prompt: '{prompt}'...")
+        _log(f"🎨 Generating with StabilityAI for prompt: '{prompt}'...", log_callback)
         api_host = "https://api.stability.ai"
         engine_id = "stable-diffusion-v1-6"
         url = f"{api_host}/v1/generation/{engine_id}/text-to-image"
@@ -79,19 +87,19 @@ class StabilityAIGenerator(ImageGenerator):
             response.raise_for_status()
             data = response.json()
             image_b64 = data["artifacts"][0]["base64"]
-            print("✅ StabilityAI image generated successfully.")
+            _log("✅ StabilityAI image generated successfully.", log_callback)
             return base64.b64decode(image_b64)
         except Exception as e:
-            print(f"❌ Error generating image with StabilityAI: {e}")
+            _log(f"❌ Error generating image with StabilityAI: {e}", log_callback)
             return None
 
 # --- Helper Functions ---
-def save_image(image_data, prompt):
+def save_image(image_data, prompt, log_callback=None):
     """Saves image data (URL or bytes) to a file."""
     if not image_data:
         return None
 
-    print(f"⬇️ Saving image...")
+    _log(f"⬇️ Saving image...", log_callback)
     try:
         safe_filename = re.sub(r'[\\/*?:"<>|]', "", prompt)[:50] + ".png"
         output_path = os.path.join(OUTPUT_DIR, safe_filename)
@@ -106,19 +114,19 @@ def save_image(image_data, prompt):
             with open(output_path, 'wb') as f:
                 f.write(image_data)
 
-        print(f"💾 Image saved successfully to: {output_path}")
+        _log(f"💾 Image saved successfully to: {output_path}", log_callback)
         return output_path
     except Exception as e:
-        print(f"❌ Error saving image: {e}")
+        _log(f"❌ Error saving image: {e}", log_callback)
         return None
 
-def create_pdf_from_images(image_paths, pdf_filename="Malbuch.pdf"):
+def create_pdf_from_images(image_paths, pdf_filename="Malbuch.pdf", log_callback=None):
     """Creates a PDF from a list of image files."""
     if not image_paths:
-        print("\n⚠️ No images were generated, skipping PDF creation.")
+        _log("\n⚠️ No images were generated, skipping PDF creation.", log_callback)
         return
 
-    print(f"\n📚 Creating PDF from {len(image_paths)} images...")
+    _log(f"\n📚 Creating PDF from {len(image_paths)} images...", log_callback)
     try:
         pdf = FPDF('P', 'mm', 'A4')
         margin = 10
@@ -134,18 +142,19 @@ def create_pdf_from_images(image_paths, pdf_filename="Malbuch.pdf"):
             pdf.image(image_path, x=x_pos, y=y_pos, w=max_width)
 
         pdf.output(pdf_filename)
-        print(f"✅ PDF created successfully: {pdf_filename}")
+        _log(f"✅ PDF created successfully: {pdf_filename}", log_callback)
     except Exception as e:
-        print(f"❌ Error creating PDF: {e}")
+        _log(f"❌ Error creating PDF: {e}", log_callback)
 
 # --- Main Execution ---
 def main():
     """Main function to run the image generation process."""
-    print("--- 🎨 Coloring Book Image Generator ---")
+    log_func = print # Use print for command-line logging
+    log_func("--- 🎨 Coloring Book Image Generator ---")
 
     config = configparser.ConfigParser()
     if not os.path.exists(CONFIG_FILE):
-        print(f"❌ FATAL: Configuration file '{CONFIG_FILE}' not found.")
+        log_func(f"❌ FATAL: Configuration file '{CONFIG_FILE}' not found.")
         return
     config.read(CONFIG_FILE)
 
@@ -161,13 +170,13 @@ def main():
             api_key = os.getenv("STABILITY_API_KEY")
             generator = StabilityAIGenerator(api_key, style_suffix)
         else:
-            print(f"❌ FATAL: Unknown provider '{provider}' in {CONFIG_FILE}. Options are 'openai' or 'stabilityai'.")
+            log_func(f"❌ FATAL: Unknown provider '{provider}' in {CONFIG_FILE}. Options are 'openai' or 'stabilityai'.")
             return
     except ValueError as e:
-        print(f"❌ FATAL: {e}")
+        log_func(f"❌ FATAL: {e}")
         return
 
-    print(f"ℹ️ Using provider: {provider}")
+    log_func(f"ℹ️ Using provider: {provider}")
 
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
@@ -176,26 +185,26 @@ def main():
         with open(PROMPTS_FILE, 'r') as f:
             prompts = [line.strip() for line in f if line.strip()]
         if not prompts:
-            print(f"⚠️ No prompts found in {PROMPTS_FILE}.")
+            log_func(f"⚠️ No prompts found in {PROMPTS_FILE}.")
             return
     except FileNotFoundError:
-        print(f"❌ FATAL: Prompts file not found at '{PROMPTS_FILE}'.")
+        log_func(f"❌ FATAL: Prompts file not found at '{PROMPTS_FILE}'.")
         return
 
-    print(f"Found {len(prompts)} prompts in {PROMPTS_FILE}.")
+    log_func(f"Found {len(prompts)} prompts in {PROMPTS_FILE}.")
 
     saved_image_paths = []
     for prompt in prompts:
-        image_data = generator.generate(prompt)
+        image_data = generator.generate(prompt, log_callback=log_func)
         if image_data:
-            saved_path = save_image(image_data, prompt)
+            saved_path = save_image(image_data, prompt, log_callback=log_func)
             if saved_path:
                 saved_image_paths.append(saved_path)
-        print("-" * 20)
+        log_func("-" * 20)
 
-    create_pdf_from_images(saved_image_paths)
+    create_pdf_from_images(saved_image_paths, log_callback=log_func)
 
-    print("\n✨ All done!")
+    log_func("\n✨ All done!")
 
 if __name__ == "__main__":
     main()

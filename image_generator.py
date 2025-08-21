@@ -5,88 +5,115 @@ from dotenv import load_dotenv
 import re
 import configparser
 from fpdf import FPDF
+import base64
 
-# Load environment variables from a .env file
+# --- Setup ---
 load_dotenv()
 
-# --- Configuration ---
-def get_style_suffix():
-    """Reads the style suffix from config.ini, with a fallback."""
-    config = configparser.ConfigParser()
-    default_style = ", for a children's coloring book, simple, clean lines, black and white, vector illustration, no shading"
-    try:
-        if not os.path.exists('config.ini'):
-            print("ℹ️ config.ini not found. Using default coloring book style.")
-            return default_style
-
-        config.read('config.ini')
-        return config.get('Generator', 'style_suffix', fallback=default_style)
-    except Exception as e:
-        print(f"⚠️  Could not read config.ini: {e}. Using default style.")
-        return default_style
-
-# It's recommended to set the OpenAI API key as an environment variable
-# for security reasons. Create a file named .env in the same directory
-# and add the following line:
-# OPENAI_API_KEY="your_secret_api_key_here"
-API_KEY = os.getenv("OPENAI_API_KEY")
+# --- Constants ---
 OUTPUT_DIR = "generated_images"
 PROMPTS_FILE = "prompts.txt"
-# Read style from config file, with a fallback to the default.
-STYLE_SUFFIX = get_style_suffix()
+CONFIG_FILE = "config.ini"
 
-def generate_image(client, prompt):
-    """
-    Generates an image using the OpenAI DALL-E API.
-    """
-    full_prompt = prompt + STYLE_SUFFIX
-    print(f"🎨 Generating image for prompt: '{prompt}'...")
-    try:
-        response = client.images.generate(
-            model="dall-e-3",
-            prompt=full_prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1,
-        )
-        image_url = response.data[0].url
-        print("✅ Image generated successfully.")
-        return image_url
-    except Exception as e:
-        print(f"❌ Error generating image: {e}")
+# --- Base Class for Image Generation ---
+class ImageGenerator:
+    """Abstract base class for image generators."""
+    def __init__(self, api_key, style_suffix):
+        if not api_key:
+            raise ValueError("API key is missing for the selected provider.")
+        self.api_key = api_key
+        self.style_suffix = style_suffix
+
+    def generate(self, prompt):
+        """Generates an image from a prompt. Returns image data as bytes or a URL."""
+        raise NotImplementedError
+
+# --- OpenAI DALL-E 3 Generator ---
+class OpenAIGenerator(ImageGenerator):
+    """Image generator using OpenAI's DALL-E 3."""
+    def __init__(self, api_key, style_suffix):
+        super().__init__(api_key, style_suffix)
+        self.client = OpenAI(api_key=self.api_key)
+
+    def generate(self, prompt):
+        full_prompt = prompt + self.style_suffix
+        print(f"🎨 Generating with OpenAI for prompt: '{prompt}'...")
+        try:
+            response = self.client.images.generate(
+                model="dall-e-3",
+                prompt=full_prompt,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+            image_url = response.data[0].url
+            print("✅ OpenAI image generated successfully.")
+            return image_url
+        except Exception as e:
+            print(f"❌ Error generating image with OpenAI: {e}")
+            return None
+
+# --- Stability AI Generator ---
+class StabilityAIGenerator(ImageGenerator):
+    """Image generator using Stability AI's API."""
+    def generate(self, prompt):
+        full_prompt = prompt + self.style_suffix
+        print(f"🎨 Generating with StabilityAI for prompt: '{prompt}'...")
+        api_host = "https://api.stability.ai"
+        engine_id = "stable-diffusion-v1-6"
+        url = f"{api_host}/v1/generation/{engine_id}/text-to-image"
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+        payload = {
+            "text_prompts": [{"text": full_prompt}],
+            "cfg_scale": 7,
+            "height": 1024,
+            "width": 1024,
+            "samples": 1,
+            "steps": 30,
+        }
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            image_b64 = data["artifacts"][0]["base64"]
+            print("✅ StabilityAI image generated successfully.")
+            return base64.b64decode(image_b64)
+        except Exception as e:
+            print(f"❌ Error generating image with StabilityAI: {e}")
+            return None
+
+# --- Helper Functions ---
+def save_image(image_data, prompt):
+    """Saves image data (URL or bytes) to a file."""
+    if not image_data:
         return None
 
-def download_and_save_image(image_url, prompt):
-    """
-    Downloads an image from a URL and saves it to the output directory.
-    """
-    if not image_url:
-        return
-
-    print(f"⬇️ Downloading image...")
+    print(f"⬇️ Saving image...")
     try:
-        response = requests.get(image_url, stream=True)
-        response.raise_for_status()  # Raise an exception for bad status codes
-
-        # Create a safe filename from the prompt
         safe_filename = re.sub(r'[\\/*?:"<>|]', "", prompt)[:50] + ".png"
         output_path = os.path.join(OUTPUT_DIR, safe_filename)
 
-        with open(output_path, 'wb') as f:
-            for chunk in response.iter_content(8192):
-                f.write(chunk)
+        if isinstance(image_data, str):
+            response = requests.get(image_data, stream=True)
+            response.raise_for_status()
+            with open(output_path, 'wb') as f:
+                for chunk in response.iter_content(8192):
+                    f.write(chunk)
+        elif isinstance(image_data, bytes):
+            with open(output_path, 'wb') as f:
+                f.write(image_data)
 
         print(f"💾 Image saved successfully to: {output_path}")
         return output_path
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error downloading image: {e}")
+    except Exception as e:
+        print(f"❌ Error saving image: {e}")
         return None
 
-
 def create_pdf_from_images(image_paths, pdf_filename="Malbuch.pdf"):
-    """
-    Creates a PDF from a list of image files.
-    """
+    """Creates a PDF from a list of image files."""
     if not image_paths:
         print("\n⚠️ No images were generated, skipping PDF creation.")
         return
@@ -94,21 +121,14 @@ def create_pdf_from_images(image_paths, pdf_filename="Malbuch.pdf"):
     print(f"\n📚 Creating PDF from {len(image_paths)} images...")
     try:
         pdf = FPDF('P', 'mm', 'A4')
-        # A4 page dimensions: 210mm x 297mm
-        # Define margins and max image dimensions to fit the page
         margin = 10
         page_width = 210
         page_height = 297
-
-        # Usable area
         max_width = page_width - 2 * margin
         max_height = page_height - 2 * margin
 
         for image_path in image_paths:
             pdf.add_page()
-            # The x, y parameters of pdf.image specify the top-left corner.
-            # We center the image on the page.
-            # For simplicity, we fit the image to the max_width and center it.
             x_pos = (page_width - max_width) / 2
             y_pos = (page_height - max_height) / 2
             pdf.image(image_path, x=x_pos, y=y_pos, w=max_width)
@@ -118,55 +138,61 @@ def create_pdf_from_images(image_paths, pdf_filename="Malbuch.pdf"):
     except Exception as e:
         print(f"❌ Error creating PDF: {e}")
 
-
+# --- Main Execution ---
 def main():
-    """
-    Main function to run the image generation process.
-    """
+    """Main function to run the image generation process."""
     print("--- 🎨 Coloring Book Image Generator ---")
 
-    if not API_KEY:
-        print("❌ FATAL: OpenAI API key not found.")
-        print("Please set the OPENAI_API_KEY environment variable.")
-        print("You can do this by creating a .env file with the line: OPENAI_API_KEY='your_key_here'")
+    config = configparser.ConfigParser()
+    if not os.path.exists(CONFIG_FILE):
+        print(f"❌ FATAL: Configuration file '{CONFIG_FILE}' not found.")
         return
+    config.read(CONFIG_FILE)
+
+    provider = config.get('General', 'provider', fallback='openai').lower()
 
     try:
-        client = OpenAI(api_key=API_KEY)
-    except Exception as e:
-        print(f"❌ FATAL: Could not initialize OpenAI client: {e}")
+        if provider == 'openai':
+            style_suffix = config.get('OpenAI', 'style_suffix', fallback="")
+            api_key = os.getenv("OPENAI_API_KEY")
+            generator = OpenAIGenerator(api_key, style_suffix)
+        elif provider == 'stabilityai':
+            style_suffix = config.get('StabilityAI', 'style_suffix', fallback="")
+            api_key = os.getenv("STABILITY_API_KEY")
+            generator = StabilityAIGenerator(api_key, style_suffix)
+        else:
+            print(f"❌ FATAL: Unknown provider '{provider}' in {CONFIG_FILE}. Options are 'openai' or 'stabilityai'.")
+            return
+    except ValueError as e:
+        print(f"❌ FATAL: {e}")
         return
 
-    # Create the output directory if it doesn't exist
+    print(f"ℹ️ Using provider: {provider}")
+
     if not os.path.exists(OUTPUT_DIR):
-        print(f"📁 Creating output directory: {OUTPUT_DIR}")
         os.makedirs(OUTPUT_DIR)
 
-    # Read prompts from the file
     try:
         with open(PROMPTS_FILE, 'r') as f:
             prompts = [line.strip() for line in f if line.strip()]
         if not prompts:
-            print(f"⚠️ No prompts found in {PROMPTS_FILE}. Please add some prompts to the file.")
+            print(f"⚠️ No prompts found in {PROMPTS_FILE}.")
             return
     except FileNotFoundError:
         print(f"❌ FATAL: Prompts file not found at '{PROMPTS_FILE}'.")
-        print("Please create it and add one prompt per line.")
         return
 
     print(f"Found {len(prompts)} prompts in {PROMPTS_FILE}.")
 
     saved_image_paths = []
-    # Generate and save an image for each prompt
     for prompt in prompts:
-        image_url = generate_image(client, prompt)
-        if image_url:
-            saved_path = download_and_save_image(image_url, prompt)
+        image_data = generator.generate(prompt)
+        if image_data:
+            saved_path = save_image(image_data, prompt)
             if saved_path:
                 saved_image_paths.append(saved_path)
         print("-" * 20)
 
-    # Create a single PDF from all generated images
     create_pdf_from_images(saved_image_paths)
 
     print("\n✨ All done!")

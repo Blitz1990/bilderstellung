@@ -1,18 +1,15 @@
 # Malbuch-Bildgenerator
 
-Dieses Tool verwendet die OpenAI DALL-E 3 API, um automatisch Bilder im Stil von Malbüchern aus einer Liste von Text-Prompts zu erstellen.
+Dieses Tool verwendet KI, um automatisch Bilder im Stil von Malbüchern (oder anderen Stilen) aus einer Liste von Text-Prompts zu erstellen. Es unterstützt mehrere KI-Anbieter.
 
 ## Features
 
-- **Bulk-Generierung**: Erzeugt mehrere Bilder auf einmal, basierend auf den Einträgen in `prompts.txt`.
-- **Angepasster Stil**: Fügt automatisch Anweisungen zu jedem Prompt hinzu, um den idealen Malbuch-Look zu erzielen (klare Linien, schwarz-weiß, keine Schattierung).
-- **Einfache Konfiguration**: Benötigt nur einen OpenAI API-Schlüssel.
-- **Organisierte Ausgabe**: Speichert alle generierten Bilder in einem separaten Ordner (`generated_images`).
-- **PDF-Export**: Fasst alle generierten Bilder automatisch in einer einzigen, druckfertigen PDF-Datei namens `Malbuch.pdf` zusammen.
+- **Multi-API-Unterstützung**: Wählen Sie zwischen verschiedenen KI-Anbietern (`OpenAI`, `StabilityAI`), um Bilder zu generieren.
+- **Bulk-Generierung**: Erzeugt mehrere Bilder auf einmal aus der `prompts.txt`-Datei.
+- **Anpassbare Stile**: Passen Sie den Bildstil für jeden Anbieter individuell in der `config.ini`-Datei an.
+- **PDF-Export**: Fasst alle generierten Bilder automatisch in einer einzigen, druckfertigen PDF-Datei (`Malbuch.pdf`) zusammen.
 
 ## Setup und Installation
-
-Folgen Sie diesen Schritten, um das Tool einzurichten und zu verwenden.
 
 ### 1. Abhängigkeiten installieren
 
@@ -22,33 +19,52 @@ Stellen Sie sicher, dass Sie Python 3 auf Ihrem System installiert haben. Führe
 pip install -r requirements.txt
 ```
 
-### 2. OpenAI API-Schlüssel einrichten
+### 2. API-Schlüssel einrichten
 
-Das Skript benötigt einen OpenAI API-Schlüssel, um Bilder generieren zu können.
+Das Skript benötigt API-Schlüssel für die Dienste, die Sie verwenden möchten. Sie müssen diese als Umgebungsvariablen einrichten.
 
 1.  Erstellen Sie eine neue Datei im Hauptverzeichnis des Projekts und nennen Sie sie `.env`.
-2.  Öffnen Sie die `.env`-Datei und fügen Sie die folgende Zeile ein. Ersetzen Sie `"dein_secret_api_key_hier"` durch Ihren tatsächlichen OpenAI API-Schlüssel.
+2.  Öffnen Sie die `.env`-Datei und fügen Sie die Schlüssel für die Dienste hinzu, die Sie nutzen möchten. Sie müssen nicht beide hinzufügen, nur den/die, den/die Sie in `config.ini` auswählen.
 
     ```
-    OPENAI_API_KEY="dein_secret_api_key_hier"
+    # Ihr Schlüssel von platform.openai.com
+    OPENAI_API_KEY="dein_openai_api_key"
+
+    # Ihr Schlüssel von platform.stability.ai
+    STABILITY_API_KEY="dein_stability_api_key"
     ```
 
-Das Skript lädt diesen Schlüssel automatisch, ohne dass Sie ihn direkt im Code preisgeben müssen.
+Das Skript lädt den entsprechenden Schlüssel automatisch, basierend auf Ihrer Anbieterauswahl in `config.ini`.
 
-## Konfiguration anpassen
+## Konfiguration (`config.ini`)
 
-Über die Datei `config.ini` können Sie das Verhalten des Generators anpassen.
+Die Hauptkonfiguration erfolgt über die `config.ini`-Datei.
 
--   **`style_suffix`**: Dieser Text wird an jeden Ihrer Prompts angehängt. Standardmäßig ist er so eingestellt, dass er Bilder im Malbuch-Stil erzeugt. Sie können diesen Wert ändern, um völlig andere Stile zu erhalten.
+### Anbieter auswählen
+Im `[General]`-Abschnitt wählen Sie den zu verwendenden Anbieter.
 
-    *Beispiel für einen fotorealistischen Stil:*
-    ```ini
-    style_suffix = , photorealistic, 4k, high detail
-    ```
-    *Beispiel für einen Aquarell-Stil:*
-    ```ini
-    style_suffix = , in a watercolor painting style, vibrant colors
-    ```
+```ini
+[General]
+# Optionen: openai, stabilityai
+provider = openai
+```
+
+### Stile anpassen
+In den anbieterspezifischen Abschnitten (`[OpenAI]`, `[StabilityAI]`) können Sie den Stil für jeden Dienst anpassen. Jeder Anbieter reagiert unterschiedlich auf Prompts, daher können Sie hier für jeden den optimalen Stil definieren.
+
+-   **`style_suffix`**: Dieser Text wird an jeden Ihrer Prompts angehängt.
+
+*Beispiel für OpenAI:*
+```ini
+[OpenAI]
+style_suffix = , for a children's coloring book, simple, clean lines, black and white, vector illustration, no shading
+```
+
+*Beispiel für StabilityAI:*
+```ini
+[StabilityAI]
+style_suffix = , coloring book page, line art, black and white
+```
 
 ## Wie man das Tool benutzt
 

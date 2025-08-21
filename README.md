@@ -8,6 +8,7 @@ Dieses Tool verwendet die OpenAI DALL-E 3 API, um automatisch Bilder im Stil von
 - **Angepasster Stil**: Fügt automatisch Anweisungen zu jedem Prompt hinzu, um den idealen Malbuch-Look zu erzielen (klare Linien, schwarz-weiß, keine Schattierung).
 - **Einfache Konfiguration**: Benötigt nur einen OpenAI API-Schlüssel.
 - **Organisierte Ausgabe**: Speichert alle generierten Bilder in einem separaten Ordner (`generated_images`).
+- **PDF-Export**: Fasst alle generierten Bilder automatisch in einer einzigen, druckfertigen PDF-Datei namens `Malbuch.pdf` zusammen.
 
 ## Setup und Installation
 
@@ -59,6 +60,8 @@ Das Skript wird nun beginnen, für jeden Prompt in `prompts.txt` ein Bild zu gen
 ### 3. Ergebnisse finden
 
 Die fertigen Bilder werden im Ordner `generated_images` als `.png`-Dateien gespeichert. Der Dateiname wird aus dem jeweiligen Prompt abgeleitet.
+
+Zusätzlich wird eine Datei namens `Malbuch.pdf` im Hauptverzeichnis erstellt, die alle Bilder als druckfertiges Malbuch enthält.
 
 ---
 Viel Spaß beim Erstellen Ihrer Malbuchseiten!

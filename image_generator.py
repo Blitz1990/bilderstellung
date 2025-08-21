@@ -3,6 +3,7 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 import re
+from fpdf import FPDF
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -60,8 +61,47 @@ def download_and_save_image(image_url, prompt):
                 f.write(chunk)
 
         print(f"💾 Image saved successfully to: {output_path}")
+        return output_path
     except requests.exceptions.RequestException as e:
         print(f"❌ Error downloading image: {e}")
+        return None
+
+
+def create_pdf_from_images(image_paths, pdf_filename="Malbuch.pdf"):
+    """
+    Creates a PDF from a list of image files.
+    """
+    if not image_paths:
+        print("\n⚠️ No images were generated, skipping PDF creation.")
+        return
+
+    print(f"\n📚 Creating PDF from {len(image_paths)} images...")
+    try:
+        pdf = FPDF('P', 'mm', 'A4')
+        # A4 page dimensions: 210mm x 297mm
+        # Define margins and max image dimensions to fit the page
+        margin = 10
+        page_width = 210
+        page_height = 297
+
+        # Usable area
+        max_width = page_width - 2 * margin
+        max_height = page_height - 2 * margin
+
+        for image_path in image_paths:
+            pdf.add_page()
+            # The x, y parameters of pdf.image specify the top-left corner.
+            # We center the image on the page.
+            # For simplicity, we fit the image to the max_width and center it.
+            x_pos = (page_width - max_width) / 2
+            y_pos = (page_height - max_height) / 2
+            pdf.image(image_path, x=x_pos, y=y_pos, w=max_width)
+
+        pdf.output(pdf_filename)
+        print(f"✅ PDF created successfully: {pdf_filename}")
+    except Exception as e:
+        print(f"❌ Error creating PDF: {e}")
+
 
 def main():
     """
@@ -100,14 +140,20 @@ def main():
 
     print(f"Found {len(prompts)} prompts in {PROMPTS_FILE}.")
 
+    saved_image_paths = []
     # Generate and save an image for each prompt
     for prompt in prompts:
         image_url = generate_image(client, prompt)
         if image_url:
-            download_and_save_image(image_url, prompt)
+            saved_path = download_and_save_image(image_url, prompt)
+            if saved_path:
+                saved_image_paths.append(saved_path)
         print("-" * 20)
 
-    print("✨ All done!")
+    # Create a single PDF from all generated images
+    create_pdf_from_images(saved_image_paths)
+
+    print("\n✨ All done!")
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from customtkinter import CTkImage
 import configparser
 import os
 import threading
@@ -10,6 +11,7 @@ from image_logic import (
     create_pdf_from_images
 )
 from dotenv import load_dotenv, set_key
+from PIL import Image
 
 # --- Constants ---
 CONFIG_FILE = "config.ini"
@@ -32,6 +34,7 @@ class App(ctk.CTk):
         self.tabs = ctk.CTkTabview(self)
         self.tabs.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         self.tabs.add("Generator")
+        self.tabs.add("Galerie")
         self.tabs.add("Settings")
 
         # --- Queue for thread-safe logging ---
@@ -39,11 +42,13 @@ class App(ctk.CTk):
 
         # --- Setup Tabs ---
         self.setup_generator_tab()
+        self.setup_gallery_tab()
         self.setup_settings_tab()
 
         # --- Load initial data ---
         self.load_settings()
         self.load_prompts()
+        self.update_gallery() # Initial gallery load
 
         # --- Start polling the log queue ---
         self.after(100, self.process_log_queue)
@@ -84,6 +89,106 @@ class App(ctk.CTk):
         self.open_pdf_button = ctk.CTkButton(log_frame, text="PDF öffnen", command=lambda: os.startfile("Malbuch.pdf") if os.path.exists("Malbuch.pdf") else None)
         self.open_pdf_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
+    def setup_gallery_tab(self):
+        """Create the widgets for the Gallery tab."""
+        tab = self.tabs.tab("Galerie")
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(1, weight=1)
+
+        # --- Top Frame for Controls ---
+        controls_frame = ctk.CTkFrame(tab)
+        controls_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+        refresh_button = ctk.CTkButton(controls_frame, text="Aktualisieren", command=self.update_gallery)
+        refresh_button.pack(side="left", padx=10, pady=5)
+
+        # --- Scrollable Frame for Images ---
+        self.gallery_frame = ctk.CTkScrollableFrame(tab, label_text="Generierte Bilder")
+        self.gallery_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+
+    def update_gallery(self):
+        """Loads images from the output directory into the gallery view."""
+        self.log("Galerie wird aktualisiert...")
+
+        # Clear existing widgets in the gallery frame
+        for widget in self.gallery_frame.winfo_children():
+            widget.destroy()
+
+        try:
+            if not os.path.exists(OUTPUT_DIR):
+                os.makedirs(OUTPUT_DIR)
+
+            image_files = sorted(
+                [f for f in os.listdir(OUTPUT_DIR) if f.lower().endswith('.png')],
+                key=lambda f: os.path.getmtime(os.path.join(OUTPUT_DIR, f)),
+                reverse=True
+            )
+
+            if not image_files:
+                ctk.CTkLabel(self.gallery_frame, text="Noch keine Bilder generiert.").pack(pady=10)
+                return
+
+            for filename in image_files:
+                filepath = os.path.join(OUTPUT_DIR, filename)
+
+                # Create a frame for each image and its controls
+                item_frame = ctk.CTkFrame(self.gallery_frame)
+                item_frame.pack(pady=10, padx=10, fill="x")
+
+                # Create thumbnail
+                try:
+                    img = Image.open(filepath)
+                    img.thumbnail((150, 150))
+                    ctk_img = CTkImage(light_image=img, dark_image=img, size=(img.width, img.height))
+
+                    img_label = ctk.CTkLabel(item_frame, image=ctk_img, text="")
+                    img_label.pack(side="left", padx=10, pady=10)
+                except Exception as e:
+                    self.log(f"Fehler beim Laden des Thumbnails für {filename}: {e}")
+                    img_label = ctk.CTkLabel(item_frame, text=f"Bild konnte nicht\ngeladen werden:\n{filename}")
+                    img_label.pack(side="left", padx=10, pady=10)
+
+                # Info label
+                info_label = ctk.CTkLabel(item_frame, text=filename, anchor="w", justify="left")
+                info_label.pack(side="left", padx=10, pady=10, expand=True, fill="x")
+
+                # --- Interaction ---
+                # Delete button
+                delete_button = ctk.CTkButton(item_frame, text="Löschen", command=lambda f=filepath: self.delete_image(f))
+                delete_button.pack(side="right", padx=10, pady=10)
+
+                # Click to open
+                def open_image_handler(f=filepath):
+                    self.open_image(f)
+
+                img_label.bind("<Button-1>", open_image_handler)
+                info_label.bind("<Button-1>", open_image_handler)
+                item_frame.bind("<Button-1>", open_image_handler)
+
+
+        except Exception as e:
+            self.log(f"Fehler beim Aktualisieren der Galerie: {e}")
+
+    def delete_image(self, filepath):
+        """Deletes an image file and refreshes the gallery."""
+        try:
+            os.remove(filepath)
+            self.log(f"🗑️ Bild gelöscht: {os.path.basename(filepath)}")
+            self.update_gallery()
+        except Exception as e:
+            self.log(f"❌ Fehler beim Löschen des Bildes {os.path.basename(filepath)}: {e}")
+
+    def open_image(self, filepath):
+        """Opens an image file in the default system viewer."""
+        try:
+            self.log(f"Öffne Bild: {os.path.basename(filepath)}...")
+            if os.path.exists(filepath):
+                os.startfile(filepath)
+            else:
+                self.log(f"❌ Fehler: Bild nicht gefunden unter {filepath}")
+                self.update_gallery() # Refresh if file is missing
+        except Exception as e:
+            self.log(f"❌ Fehler beim Öffnen des Bildes: {e}")
 
     def setup_settings_tab(self):
         """Create the widgets for the Settings tab."""
@@ -275,6 +380,9 @@ class App(ctk.CTk):
             self.log("-" * 20)
 
         create_pdf_from_images(saved_image_paths, log_callback=self.log)
+
+        # Schedule gallery update on the main thread
+        self.after(0, self.update_gallery)
 
         self.log("\n✨ Fertig!")
         self.generate_button.configure(state="normal", text="Bilder generieren")

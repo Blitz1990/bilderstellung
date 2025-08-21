@@ -36,6 +36,7 @@ class App(ctk.CTk):
         self.tabs.add("Generator")
         self.tabs.add("Galerie")
         self.tabs.add("Settings")
+        self.tabs.add("Hilfe")
 
         # --- Queue for thread-safe logging ---
         self.log_queue = queue.Queue()
@@ -44,6 +45,7 @@ class App(ctk.CTk):
         self.setup_generator_tab()
         self.setup_gallery_tab()
         self.setup_settings_tab()
+        self.setup_help_tab()
 
         # --- Load initial data ---
         self.load_settings()
@@ -241,6 +243,60 @@ class App(ctk.CTk):
         # --- Save Button ---
         self.save_settings_button = ctk.CTkButton(tab, text="Einstellungen speichern", command=self.save_settings)
         self.save_settings_button.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
+
+    def setup_help_tab(self):
+        """Create the widgets for the Help tab with explanations."""
+        tab = self.tabs.tab("Hilfe")
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(0, weight=1)
+
+        scroll_frame = ctk.CTkScrollableFrame(tab, label_text="Hilfe & Anleitung")
+        scroll_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        scroll_frame.grid_columnconfigure(0, weight=1)
+
+        # --- Define fonts ---
+        title_font = ctk.CTkFont(size=18, weight="bold", underline=True)
+        subtitle_font = ctk.CTkFont(size=14, weight="bold")
+        body_font = ctk.CTkFont(size=12)
+
+        # --- Helper function to add content ---
+        def add_section(parent, title, content):
+            ctk.CTkLabel(parent, text=title, font=subtitle_font, anchor="w").pack(pady=(15, 5), padx=10, fill="x")
+            ctk.CTkLabel(parent, text=content, font=body_font, anchor="w", justify="left", wraplength=700).pack(pady=0, padx=10, fill="x")
+
+        # --- Introduction ---
+        ctk.CTkLabel(scroll_frame, text="Anleitung zum Malbuch-Generator", font=title_font, anchor="w").pack(pady=10, padx=10, fill="x")
+
+        # --- Generator Tab Section ---
+        generator_content = (
+            'Im "Generator"-Tab findet die eigentliche Bilderstellung statt.\n\n'
+            'Prompts: Geben Sie hier Ihre Bildideen ein, eine Idee pro Zeile. Ein "Prompt" ist eine detaillierte Beschreibung dessen, was die KI zeichnen soll.\n'
+            'Beispiel: Ein Astronaut, der auf einem Elefanten durch den Weltraum reitet\n\n'
+            'Bilder generieren: Startet den Prozess. Für jeden Prompt wird ein Bild erstellt. Den Fortschritt können Sie im Log-Fenster auf der rechten Seite verfolgen.\n\n'
+            'Prompts speichern: Sichert alle Prompts aus dem Textfeld in der Datei "prompts.txt".\n\n'
+            'PDF öffnen: Nachdem die Bilder erstellt wurden, fasst das Tool alle in einer einzigen "Malbuch.pdf"-Datei zusammen. Dieser Knopf öffnet die PDF.'
+        )
+        add_section(scroll_frame, "Der Generator-Tab", generator_content)
+
+        # --- Gallery Tab Section ---
+        gallery_content = (
+            'Die "Galerie" zeigt Ihnen alle Bilder an, die im Ordner "generated_images" gespeichert sind.\n\n'
+            'Aktualisieren: Lädt die Ansicht neu. Nützlich, wenn Sie Bilder manuell im Ordner geändert haben.\n\n'
+            'Auf ein Bild klicken: Öffnet das ausgewählte Bild in voller Größe mit Ihrem Standard-Bildbetrachtungsprogramm.\n\n'
+            'Löschen: Entfernt das entsprechende Bild dauerhaft von Ihrer Festplatte.'
+        )
+        add_section(scroll_frame, "Die Galerie", gallery_content)
+
+        # --- Settings Tab Section ---
+        settings_content = (
+            'Hier können Sie das Verhalten des Tools anpassen.\n\n'
+            'API Keys: Tragen Sie hier Ihre persönlichen Schlüssel für die KI-Dienste ein. Ohne einen gültigen API-Schlüssel können keine Bilder generiert werden. Ihre Schlüssel werden nur lokal auf Ihrem Computer gespeichert.\n\n'
+            'Bild-Anbieter: Wählen Sie den KI-Dienst, den Sie verwenden möchten. "openai" (DALL-E 3) und "stabilityai" haben unterschiedliche Stärken. Probieren Sie beide aus, um zu sehen, welcher Stil Ihnen besser gefällt.\n\n'
+            'Stil-Suffix: Dies ist die wichtigste Einstellung, um den Malbuch-Stil zu erreichen. Der Text, den Sie hier eingeben, wird automatisch an jeden Ihrer Prompts angehängt. So geben Sie der KI die Anweisung, ein Bild in einem bestimmten Stil zu erstellen.\n'
+            'Beispiel: , für ein Malbuch für Kinder, einfache klare Linien, schwarz und weiß, keine Schattierungen\n\n'
+            'Einstellungen speichern: Sichert alle Änderungen auf dieser Seite.'
+        )
+        add_section(scroll_frame, "Die Einstellungen", settings_content)
 
 
     def log(self, message):

@@ -35,6 +35,21 @@ Das Skript benötigt einen OpenAI API-Schlüssel, um Bilder generieren zu könne
 
 Das Skript lädt diesen Schlüssel automatisch, ohne dass Sie ihn direkt im Code preisgeben müssen.
 
+## Konfiguration anpassen
+
+Über die Datei `config.ini` können Sie das Verhalten des Generators anpassen.
+
+-   **`style_suffix`**: Dieser Text wird an jeden Ihrer Prompts angehängt. Standardmäßig ist er so eingestellt, dass er Bilder im Malbuch-Stil erzeugt. Sie können diesen Wert ändern, um völlig andere Stile zu erhalten.
+
+    *Beispiel für einen fotorealistischen Stil:*
+    ```ini
+    style_suffix = , photorealistic, 4k, high detail
+    ```
+    *Beispiel für einen Aquarell-Stil:*
+    ```ini
+    style_suffix = , in a watercolor painting style, vibrant colors
+    ```
+
 ## Wie man das Tool benutzt
 
 ### 1. Prompts hinzufügen

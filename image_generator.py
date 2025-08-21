@@ -3,12 +3,28 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 import re
+import configparser
 from fpdf import FPDF
 
 # Load environment variables from a .env file
 load_dotenv()
 
 # --- Configuration ---
+def get_style_suffix():
+    """Reads the style suffix from config.ini, with a fallback."""
+    config = configparser.ConfigParser()
+    default_style = ", for a children's coloring book, simple, clean lines, black and white, vector illustration, no shading"
+    try:
+        if not os.path.exists('config.ini'):
+            print("ℹ️ config.ini not found. Using default coloring book style.")
+            return default_style
+
+        config.read('config.ini')
+        return config.get('Generator', 'style_suffix', fallback=default_style)
+    except Exception as e:
+        print(f"⚠️  Could not read config.ini: {e}. Using default style.")
+        return default_style
+
 # It's recommended to set the OpenAI API key as an environment variable
 # for security reasons. Create a file named .env in the same directory
 # and add the following line:
@@ -16,8 +32,8 @@ load_dotenv()
 API_KEY = os.getenv("OPENAI_API_KEY")
 OUTPUT_DIR = "generated_images"
 PROMPTS_FILE = "prompts.txt"
-# This suffix is added to each prompt to get the desired coloring book style
-STYLE_SUFFIX = ", for a children's coloring book, simple, clean lines, black and white, vector illustration, no shading"
+# Read style from config file, with a fallback to the default.
+STYLE_SUFFIX = get_style_suffix()
 
 def generate_image(client, prompt):
     """
